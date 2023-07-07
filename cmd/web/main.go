@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/alancesar/imgur-fetcher/internal/controller"
 	"github.com/alancesar/imgur-fetcher/pkg/imgur"
+	"github.com/alancesar/imgur-fetcher/pkg/pubsub"
 	"github.com/alancesar/imgur-fetcher/pkg/transport"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,12 +33,27 @@ func main() {
 		}, defaultClient.Transport),
 	}
 
+	amqpConnection, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
+	if err != nil {
+		log.Fatalln("failed to start amqp connection:", err)
+	}
+
+	defer func() {
+		_ = amqpConnection.Close()
+	}()
+
+	publisher, err := pubsub.NewRabbitMQPublisher(amqpConnection, "fetcher", "imgur")
+	if err != nil {
+		log.Fatalln("failed to start fetcher publisher:", err)
+	}
+
 	imgurClient := imgur.NewClient(imgurAuthClient)
-	imgurController := controller.New(imgurClient)
+	imgurController := controller.New(defaultClient, imgurClient, publisher)
 
 	mux := chi.NewMux()
 	mux.Use(middleware.Logger, middleware.SetHeader("Content-Type", "application/json"))
 	mux.Post("/", imgurController.GetMediaByURL)
+	mux.Post("/publish", imgurController.PublishMedia)
 
 	server := &http.Server{
 		Handler: mux,
