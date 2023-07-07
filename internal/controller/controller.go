@@ -15,12 +15,8 @@ type (
 		client Client
 	}
 
-	Request struct {
-		URL string `json:"url"`
-	}
-
 	Response struct {
-		Urls []string `json:"urls"`
+		URLs []string `json:"urls"`
 	}
 )
 
@@ -31,22 +27,25 @@ func New(client Client) *Controller {
 }
 
 func (c Controller) GetMediaByURL(w http.ResponseWriter, r *http.Request) {
-	var request Request
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	var req struct {
+		URL string `json:"url"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	media, err := c.client.GetMediaByURL(request.URL)
+	m, err := c.client.GetMediaByURL(req.URL)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	var response Response
-	response.Urls = make([]string, len(media), len(media))
-	for i, m := range media {
-		response.Urls[i] = m.HigherQualityURL()
+	response.URLs = make([]string, len(m), len(m))
+	for i, m := range m {
+		response.URLs[i] = m.HigherQualityURL()
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
