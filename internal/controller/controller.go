@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/alancesar/imgur-fetcher/pkg/imgur"
+	"github.com/alancesar/imgur-fetcher/pkg/media"
 	"net/http"
 )
 
@@ -11,8 +13,14 @@ type (
 		GetMediaByURL(url string) ([]imgur.Media, error)
 	}
 
+	Publisher interface {
+		Publish(ctx context.Context, req media.Media) error
+	}
+
 	Controller struct {
-		client Client
+		httpClient *http.Client
+		client     Client
+		publisher  Publisher
 	}
 
 	Response struct {
@@ -20,9 +28,11 @@ type (
 	}
 )
 
-func New(client Client) *Controller {
+func New(httpClient *http.Client, client Client, publisher Publisher) *Controller {
 	return &Controller{
-		client: client,
+		httpClient: httpClient,
+		client:     client,
+		publisher:  publisher,
 	}
 }
 
@@ -54,4 +64,31 @@ func (c Controller) GetMediaByURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c Controller) PublishMedia(w http.ResponseWriter, r *http.Request) {
+	var m media.Media
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	res, err := c.httpClient.Head(m.URL)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode >= http.StatusBadRequest {
+		w.WriteHeader(res.StatusCode)
+		return
+	}
+
+	m.URL = res.Request.URL.String()
+	if err := c.publisher.Publish(r.Context(), m); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
