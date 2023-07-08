@@ -73,11 +73,13 @@ func (c Client) GetMediaByURL(rawURL string) ([]Media, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		return album.Images, nil
 	}
 
 	media, err := c.GetMedia(request.ID)
+	if err != nil {
+		return nil, err
+	}
 	return []Media{media}, nil
 }
 
