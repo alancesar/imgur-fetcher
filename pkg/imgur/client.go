@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -123,16 +122,8 @@ func compileURL(rawURL string) (Request, error) {
 	}
 
 	isAlbum := isAlbumURL(parsedURL.Path)
-	id := path.Base(parsedURL.Path)
-
-	if ext := filepath.Ext(id); ext != "" {
-		id = strings.ReplaceAll(id, ext, "")
-		return Request{
-			ID:      id,
-			IsAlbum: isAlbum,
-		}, nil
-	}
-
+	elem := strings.Split(parsedURL.Path, ".")
+	id := path.Base(elem[0])
 	return Request{
 		ID:      id,
 		IsAlbum: isAlbum,
