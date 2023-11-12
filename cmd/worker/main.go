@@ -120,15 +120,23 @@ func main() {
 	}
 
 	go func() {
+		type post struct {
+			Author string `json:"author"`
+			URL    string `json:"url"`
+		}
+
 		for message := range messages {
-			var m media.Media
-			if err := json.Unmarshal(message.Body, &m); err != nil {
+			var p post
+			if err := json.Unmarshal(message.Body, &p); err != nil {
 				fmt.Println("failed to unmarshal message")
 				_ = message.Ack(false)
 				continue
 			}
 
-			if err := consumer(m); err != nil {
+			if err := consumer(media.Media{
+				URL:    p.URL,
+				Parent: []string{"u", p.Author},
+			}); err != nil {
 				fmt.Println("failed to handle message")
 				_ = message.Nack(false, true)
 			} else {
